@@ -23,6 +23,12 @@ generate_config() {
     # Generate auth token if not provided (exported for use in WebChat injection)
     AUTH_TOKEN="${CLAWDBOT_GATEWAY_TOKEN:-$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32)}"
 
+    # Validate token is alphanumeric only (security: prevents injection in HTML/JS)
+    if [[ ! "${AUTH_TOKEN}" =~ ^[a-zA-Z0-9]+$ ]]; then
+        echo "ERROR: Auth token must be alphanumeric only. Invalid characters found."
+        exit 1
+    fi
+
     # Write configuration file
     # Note: WebChat UI is served by Gateway on port 18789 at /chat
     # bind: "lan" required to expose outside container (default is loopback)
