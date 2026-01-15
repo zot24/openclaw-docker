@@ -26,6 +26,9 @@ RUN pnpm install --frozen-lockfile || pnpm install
 # Build the application
 RUN pnpm build
 
+# Build the UI assets (Control Panel, WebChat)
+RUN pnpm ui:build
+
 # Create data directories
 RUN mkdir -p /root/.clawdbot /root/clawd
 
@@ -34,16 +37,16 @@ COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Expose ports
-# 18789: Gateway WebSocket API
-# 18790: WebChat UI
+# 18789: Gateway (HTTP + WebSocket + WebChat at /chat)
+# 18790: Bridge (TCP for mobile nodes)
 EXPOSE 18789 18790
 
 # Set environment
 ENV NODE_ENV=production
 
-# Health check
+# Health check (gateway serves HTTP on 18789)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:18790/ || exit 1
+    CMD curl -f http://localhost:18789/ || exit 1
 
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["gateway"]
