@@ -20,8 +20,8 @@ generate_config() {
         TELEGRAM_TOKEN="${TELEGRAM_BOT_TOKEN}"
     fi
 
-    # Generate auth token if not provided
-    local AUTH_TOKEN="${CLAWDBOT_GATEWAY_TOKEN:-$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32)}"
+    # Generate auth token if not provided (exported for use in WebChat injection)
+    AUTH_TOKEN="${CLAWDBOT_GATEWAY_TOKEN:-$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32)}"
 
     # Write configuration file
     # Note: WebChat UI is served by Gateway on port 18789 at /chat
@@ -115,6 +115,18 @@ fi
 echo "Starting Clawdbot..."
 echo "  Gateway port: ${CLAWDBOT_GATEWAY_PORT:-18789}"
 echo "  WebChat UI: http://localhost:${CLAWDBOT_GATEWAY_PORT:-18789}/chat"
+
+# Inject auth token into WebChat UI so it can connect to the gateway
+# The WebChat stores settings (including token) in localStorage under a specific key
+# We inject a script that pre-populates the token before the app loads
+WEBCHAT_INDEX="/app/dist/ui/chat/index.html"
+if [ -f "${WEBCHAT_INDEX}" ]; then
+    # Inject script that sets the token in localStorage before the app initializes
+    # The app reads settings from localStorage and uses the token for WebSocket auth
+    INJECT_SCRIPT="<script>(function(){try{var k='clawdbot-control-settings',s=localStorage.getItem(k),o=s?JSON.parse(s):{};if(!o.token){o.token='${AUTH_TOKEN}';localStorage.setItem(k,JSON.stringify(o));}}catch(e){}})();</script>"
+    sed -i "s|</head>|${INJECT_SCRIPT}</head>|" "${WEBCHAT_INDEX}"
+    echo "  Auth token injected into WebChat UI"
+fi
 
 # Start the gateway
 cd /app
