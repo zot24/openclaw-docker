@@ -144,61 +144,55 @@ generate_config() {
       }"
     fi
 
-    # OpenAI provider
-    if [ -n "${OPENAI_API_KEY}" ]; then
-        HAS_PROVIDERS="true"
-        local OPENAI_BASE="${OPENAI_BASE_URL:-https://api.openai.com/v1}"
-        local OPENAI_ORG_LINE=""
-        [ -n "${OPENAI_ORG_ID}" ] && OPENAI_ORG_LINE=",\"organization\": \"${OPENAI_ORG_ID}\""
-        PROVIDERS_JSON="${PROVIDERS_JSON}${PROVIDERS_JSON:+,}
-      \"openai\": {
-        \"baseUrl\": \"${OPENAI_BASE}\",
-        \"apiKey\": \"${OPENAI_API_KEY}\"${OPENAI_ORG_LINE}
-      }"
-    fi
+    # Note: Built-in providers (Anthropic, OpenAI, OpenRouter) use API keys from environment
+    # variables automatically. We only need to add custom providers to the models section.
+    # Custom providers need explicit configuration with baseUrl, api type, and models array.
 
-    # OpenRouter provider
-    if [ -n "${OPENROUTER_API_KEY}" ]; then
-        HAS_PROVIDERS="true"
-        PROVIDERS_JSON="${PROVIDERS_JSON}${PROVIDERS_JSON:+,}
-      \"openrouter\": {
-        \"baseUrl\": \"https://openrouter.ai/api/v1\",
-        \"apiKey\": \"${OPENROUTER_API_KEY}\",
-        \"api\": \"openai-chat\"
-      }"
-    fi
-
-    # Moonshot provider (Chinese LLM)
+    # Moonshot provider (Chinese LLM) - custom provider
     if [ -n "${MOONSHOT_API_KEY}" ]; then
         HAS_PROVIDERS="true"
         PROVIDERS_JSON="${PROVIDERS_JSON}${PROVIDERS_JSON:+,}
       \"moonshot\": {
         \"baseUrl\": \"https://api.moonshot.cn/v1\",
         \"apiKey\": \"${MOONSHOT_API_KEY}\",
-        \"api\": \"openai-chat\"
+        \"api\": \"openai-chat\",
+        \"models\": [
+          { \"id\": \"moonshot-v1-8k\", \"name\": \"Moonshot v1 8K\", \"contextWindow\": 8000 },
+          { \"id\": \"moonshot-v1-32k\", \"name\": \"Moonshot v1 32K\", \"contextWindow\": 32000 },
+          { \"id\": \"moonshot-v1-128k\", \"name\": \"Moonshot v1 128K\", \"contextWindow\": 128000 }
+        ]
       }"
     fi
 
-    # GLM provider (ChatGLM)
+    # GLM provider (ChatGLM) - custom provider
     if [ -n "${GLM_API_KEY}" ]; then
         HAS_PROVIDERS="true"
         PROVIDERS_JSON="${PROVIDERS_JSON}${PROVIDERS_JSON:+,}
       \"glm\": {
         \"baseUrl\": \"https://open.bigmodel.cn/api/paas/v4\",
         \"apiKey\": \"${GLM_API_KEY}\",
-        \"api\": \"openai-chat\"
+        \"api\": \"openai-chat\",
+        \"models\": [
+          { \"id\": \"glm-4-plus\", \"name\": \"GLM-4 Plus\", \"contextWindow\": 128000 },
+          { \"id\": \"glm-4\", \"name\": \"GLM-4\", \"contextWindow\": 128000 },
+          { \"id\": \"glm-4-flash\", \"name\": \"GLM-4 Flash\", \"contextWindow\": 128000 }
+        ]
       }"
     fi
 
-    # OpenCode provider (local models: Ollama, vLLM, LM Studio, etc.)
+    # OpenCode provider (local models: Ollama, vLLM, LM Studio, etc.) - custom provider
     if [ -n "${OPENCODE_BASE_URL}" ]; then
         HAS_PROVIDERS="true"
         local OPENCODE_KEY_LINE=""
         [ -n "${OPENCODE_API_KEY}" ] && OPENCODE_KEY_LINE=",\"apiKey\": \"${OPENCODE_API_KEY}\""
+        local OPENCODE_MODEL_ID="${OPENCODE_MODEL:-llama3.1}"
         PROVIDERS_JSON="${PROVIDERS_JSON}${PROVIDERS_JSON:+,}
       \"opencode\": {
         \"baseUrl\": \"${OPENCODE_BASE_URL}\"${OPENCODE_KEY_LINE},
-        \"api\": \"openai-chat\"
+        \"api\": \"openai-chat\",
+        \"models\": [
+          { \"id\": \"${OPENCODE_MODEL_ID}\", \"name\": \"${OPENCODE_MODEL_ID}\", \"contextWindow\": 128000 }
+        ]
       }"
     fi
 
