@@ -25,7 +25,6 @@ RUN usermod -l clawdbot -d /home/clawdbot -m node \
 # - Media processing: ffmpeg, imagemagick
 # - Browser automation: chromium and dependencies
 # - Python tools: python3, pip
-# - Go: for sag TTS tool
 # - Audio: ALSA/PulseAudio for TTS playback
 # - Utilities: gh (GitHub CLI), zip, unzip, tar
 RUN apt-get update && apt-get install -y \
@@ -36,8 +35,6 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     # GitHub CLI
     gh \
-    # Go (for sag TTS)
-    golang-go \
     # Media processing
     ffmpeg \
     imagemagick \
@@ -85,6 +82,13 @@ RUN npm install -g mcporter
 
 # Install Python tools (uv/uvx for running Python MCP tools, whisper for STT)
 RUN pip3 install --no-cache-dir --break-system-packages uv openai-whisper
+
+# Install Go from official source (Debian's golang-go is too old for sag)
+# sag requires Go 1.24+, Debian bookworm only has 1.19
+ARG GO_VERSION=1.24.3
+RUN ARCH=$(dpkg --print-architecture) && \
+    curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-${ARCH}.tar.gz" | tar -C /usr/local -xzf -
+ENV PATH="/usr/local/go/bin:${PATH}"
 
 # Install sag (ElevenLabs TTS CLI)
 # https://github.com/steipete/sag
