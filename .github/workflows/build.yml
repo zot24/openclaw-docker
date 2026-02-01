@@ -4,22 +4,20 @@ on:
   push:
     branches: [main]
     tags: ['v*']
-  pull_request:
-    branches: [main]
   workflow_dispatch:
     inputs:
-      clawdbot_version:
-        description: 'Clawdbot version/branch to build'
+      openclaw_version:
+        description: 'OpenClaw version/branch to build'
         required: false
         default: 'main'
   workflow_call:
     inputs:
-      clawdbot_version:
-        description: 'Clawdbot version/branch to build'
+      openclaw_version:
+        description: 'OpenClaw version/branch to build'
         required: true
         type: string
   schedule:
-    # Rebuild weekly to get Clawdbot updates
+    # Rebuild weekly to get OpenClaw updates
     - cron: '0 0 * * 0'
 
 env:
@@ -50,13 +48,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Determine Clawdbot version
+      - name: Determine OpenClaw version
         id: version
         run: |
           # workflow_call inputs take precedence, then workflow_dispatch, then default
-          VERSION="${{ inputs.clawdbot_version || github.event.inputs.clawdbot_version || 'main' }}"
-          echo "clawdbot_version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Building Clawdbot version: $VERSION"
+          VERSION="${{ inputs.openclaw_version || github.event.inputs.openclaw_version || 'main' }}"
+          echo "openclaw_version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building OpenClaw version: $VERSION"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -81,7 +79,7 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix=
             type=ref,event=tag
-            type=raw,value=clawdbot-${{ steps.version.outputs.clawdbot_version }},enable=${{ steps.version.outputs.clawdbot_version != 'main' }}
+            type=raw,value=openclaw-${{ steps.version.outputs.openclaw_version }},enable=${{ steps.version.outputs.openclaw_version != 'main' }}
 
       - name: Build and push
         uses: docker/build-push-action@v5
@@ -92,6 +90,6 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            CLAWDBOT_VERSION=${{ steps.version.outputs.clawdbot_version }}
+            OPENCLAW_VERSION=${{ steps.version.outputs.openclaw_version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

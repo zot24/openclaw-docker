@@ -1,19 +1,19 @@
 #!/bin/bash
 set -e
 
-# Default paths use clawdbot user's home directory for security
-# The container runs as non-root 'clawdbot' user (UID 1000)
-CONFIG_DIR="${CLAWDBOT_DATA_DIR:-/home/clawdbot/.clawdbot}"
-CONFIG_FILE="${CONFIG_DIR}/clawdbot.json"
-WORKSPACE="${CLAWDBOT_WORKSPACE:-/home/clawdbot/clawd}"
+# Default paths use openclaw user's home directory for security
+# The container runs as non-root 'openclaw' user (UID 1000)
+CONFIG_DIR="${OPENCLAW_DATA_DIR:-/home/openclaw/.openclaw}"
+CONFIG_FILE="${CONFIG_DIR}/openclaw.json"
+WORKSPACE="${OPENCLAW_WORKSPACE:-/home/openclaw/clawd}"
 TOKEN_FILE="${CONFIG_DIR}/.gateway_token"
 
 # Get or generate gateway token with persistence
-# Priority: 1) CLAWDBOT_GATEWAY_TOKEN env var, 2) Persisted token file, 3) Generate new
+# Priority: 1) OPENCLAW_GATEWAY_TOKEN env var, 2) Persisted token file, 3) Generate new
 get_or_generate_token() {
-    if [ -n "${CLAWDBOT_GATEWAY_TOKEN}" ]; then
+    if [ -n "${OPENCLAW_GATEWAY_TOKEN}" ]; then
         # User provided token via env var - use it (don't persist, user controls it)
-        echo "${CLAWDBOT_GATEWAY_TOKEN}"
+        echo "${OPENCLAW_GATEWAY_TOKEN}"
     elif [ -f "${TOKEN_FILE}" ]; then
         # Use persisted token from previous run
         cat "${TOKEN_FILE}"
@@ -41,12 +41,12 @@ mkdir -p "${CONFIG_DIR}/credentials/whatsapp/default"
 
 # Generate configuration if it doesn't exist or if Telegram token changed
 generate_config() {
-    echo "Generating Clawdbot configuration..."
+    echo "Generating OpenClaw configuration..."
 
     # Build Telegram configuration
     local TELEGRAM_ENABLED="false"
     local TELEGRAM_TOKEN=""
-    local TELEGRAM_DM_POLICY="${CLAWDBOT_DM_POLICY:-pairing}"
+    local TELEGRAM_DM_POLICY="${OPENCLAW_DM_POLICY:-pairing}"
     local TELEGRAM_ALLOW_FROM=""
     if [ -n "${TELEGRAM_BOT_TOKEN}" ]; then
         TELEGRAM_ENABLED="true"
@@ -62,7 +62,6 @@ generate_config() {
     fi
 
     # Build WhatsApp configuration
-    local WHATSAPP_ENABLED="${WHATSAPP_ENABLED:-false}"
     local WHATSAPP_DM_POLICY="${WHATSAPP_DM_POLICY:-pairing}"
     local WHATSAPP_GROUP_POLICY="${WHATSAPP_GROUP_POLICY:-disabled}"
 
@@ -86,7 +85,6 @@ generate_config() {
 
     # Build Discord configuration
     local DISCORD_ENABLED="false"
-    local DISCORD_DM_POLICY="${DISCORD_DM_POLICY:-pairing}"
     local DISCORD_TOKEN_LINE=""
     local DISCORD_ALLOW_LINE=""
     if [ -n "${DISCORD_BOT_TOKEN}" ]; then
@@ -142,7 +140,7 @@ generate_config() {
     fi
 
     # Determine model configuration based on available API keys
-    # Priority: CLAWDBOT_MODEL (explicit) > MiniMax > Anthropic > OpenAI > OpenRouter > Moonshot > GLM > OpenCode
+    # Priority: OPENCLAW_MODEL (explicit) > MiniMax > Anthropic > OpenAI > OpenRouter > Moonshot > GLM > OpenCode
     local MODEL_CONFIG=""
     local MODELS_SECTION=""
     local PROVIDERS_JSON=""
@@ -235,50 +233,32 @@ generate_config() {
     fi
 
     # Determine primary model (explicit override or auto-select)
-    if [ -n "${CLAWDBOT_MODEL}" ]; then
+    # Model must be an object with "primary" key
+    if [ -n "${OPENCLAW_MODEL}" ]; then
         # Explicit model override
-        MODEL_CONFIG="\"model\": \"${CLAWDBOT_MODEL}\""
+        MODEL_CONFIG="\"model\": { \"primary\": \"${OPENCLAW_MODEL}\" }"
     elif [ -n "${MINIMAX_API_KEY}" ]; then
         MODEL_CONFIG="\"model\": { \"primary\": \"minimax/MiniMax-M2.1\" }"
     elif [ -n "${ANTHROPIC_API_KEY}" ]; then
-        MODEL_CONFIG="\"model\": \"anthropic/claude-sonnet-4\""
+        MODEL_CONFIG="\"model\": { \"primary\": \"anthropic/claude-sonnet-4\" }"
     elif [ -n "${OPENAI_API_KEY}" ]; then
-        MODEL_CONFIG="\"model\": \"openai/gpt-4o\""
+        MODEL_CONFIG="\"model\": { \"primary\": \"openai/gpt-4o\" }"
     elif [ -n "${OPENROUTER_API_KEY}" ]; then
-        MODEL_CONFIG="\"model\": \"openrouter/anthropic/claude-sonnet-4\""
+        MODEL_CONFIG="\"model\": { \"primary\": \"openrouter/anthropic/claude-sonnet-4\" }"
     elif [ -n "${MOONSHOT_API_KEY}" ]; then
-        MODEL_CONFIG="\"model\": \"moonshot/moonshot-v1-128k\""
+        MODEL_CONFIG="\"model\": { \"primary\": \"moonshot/moonshot-v1-128k\" }"
     elif [ -n "${GLM_API_KEY}" ]; then
-        MODEL_CONFIG="\"model\": \"glm/glm-4-plus\""
+        MODEL_CONFIG="\"model\": { \"primary\": \"glm/glm-4-plus\" }"
     elif [ -n "${OPENCODE_BASE_URL}" ]; then
-        MODEL_CONFIG="\"model\": \"opencode/${OPENCODE_MODEL:-llama3.1}\""
+        MODEL_CONFIG="\"model\": { \"primary\": \"opencode/${OPENCODE_MODEL:-llama3.1}\" }"
     else
         # No provider configured, default to Anthropic (will fail without key)
-        MODEL_CONFIG="\"model\": \"anthropic/claude-sonnet-4\""
+        MODEL_CONFIG="\"model\": { \"primary\": \"anthropic/claude-sonnet-4\" }"
     fi
 
     # Runtime configuration
     local AGENT_TIMEOUT="${AGENT_TIMEOUT:-600}"
-    local AGENT_TIMEZONE="${AGENT_TIMEZONE:-UTC}"
     local ENABLE_MEMORY="${ENABLE_MEMORY_SEARCH:-false}"
-    local ENABLE_BROWSER="${ENABLE_BROWSER:-true}"
-    local ENABLE_EXEC="${ENABLE_EXEC:-true}"
-    local EXEC_TIMEOUT="${EXEC_TIMEOUT:-30000}"
-
-    # Build tools configuration
-    local TOOLS_CONFIG=""
-    if [ "${ENABLE_BROWSER}" = "true" ] || [ "${ENABLE_EXEC}" = "true" ]; then
-        local TOOL_ENTRIES=""
-        if [ "${ENABLE_BROWSER}" = "true" ]; then
-            TOOL_ENTRIES="\"browser\": { \"enabled\": true }"
-        fi
-        if [ "${ENABLE_EXEC}" = "true" ]; then
-            [ -n "${TOOL_ENTRIES}" ] && TOOL_ENTRIES="${TOOL_ENTRIES},"
-            TOOL_ENTRIES="${TOOL_ENTRIES}\"exec\": { \"enabled\": true, \"timeout\": ${EXEC_TIMEOUT} }"
-        fi
-        TOOLS_CONFIG=",
-      \"tools\": { ${TOOL_ENTRIES} }"
-    fi
 
     # Gateway configuration
     local GATEWAY_MODE="${GATEWAY_MODE:-local}"
@@ -291,7 +271,7 @@ generate_config() {
 {
   "gateway": {
     "mode": "${GATEWAY_MODE}",
-    "port": ${CLAWDBOT_GATEWAY_PORT:-18789},
+    "port": ${OPENCLAW_GATEWAY_PORT:-18789},
     "bind": "${GATEWAY_BIND}",
     "auth": {
       "mode": "token",
@@ -306,13 +286,11 @@ generate_config() {
       "streamMode": "partial"${TELEGRAM_ALLOW_LINE}
     },
     "whatsapp": {
-      "enabled": ${WHATSAPP_ENABLED},
       "dmPolicy": "${WHATSAPP_DM_POLICY}",
       "groupPolicy": "${WHATSAPP_GROUP_POLICY}"${WHATSAPP_ALLOW_LINE}${WHATSAPP_GROUPS_LINE}
     },
     "discord": {
-      "enabled": ${DISCORD_ENABLED},
-      "dmPolicy": "${DISCORD_DM_POLICY}"${DISCORD_TOKEN_LINE}${DISCORD_ALLOW_LINE}
+      "enabled": ${DISCORD_ENABLED}${DISCORD_TOKEN_LINE}${DISCORD_ALLOW_LINE}
     },
     "slack": {
       "enabled": ${SLACK_ENABLED}${SLACK_TOKEN_LINES}${SLACK_ALLOW_LINE}
@@ -329,10 +307,9 @@ generate_config() {
       ${MODEL_CONFIG},
       "workspace": "${WORKSPACE}",
       "timeoutSeconds": ${AGENT_TIMEOUT},
-      "timezone": "${AGENT_TIMEZONE}",
       "memorySearch": {
         "enabled": ${ENABLE_MEMORY}
-      }${TOOLS_CONFIG}
+      }
     }
   },
   "skills": {
@@ -344,10 +321,10 @@ EOF
 }
 
 # Check if user provided a config file (mounted volume)
-# If config exists and CLAWDBOT_REGEN_CONFIG is not set, use existing config
-if [ -f "${CONFIG_FILE}" ] && [ "${CLAWDBOT_REGEN_CONFIG}" != "true" ]; then
+# If config exists and OPENCLAW_REGEN_CONFIG is not set, use existing config
+if [ -f "${CONFIG_FILE}" ] && [ "${OPENCLAW_REGEN_CONFIG}" != "true" ]; then
     echo "Using existing configuration at ${CONFIG_FILE}"
-    echo "(Set CLAWDBOT_REGEN_CONFIG=true to regenerate from env vars)"
+    echo "(Set OPENCLAW_REGEN_CONFIG=true to regenerate from env vars)"
 
     # Get or generate auth token with persistence
     AUTH_TOKEN=$(get_or_generate_token)
@@ -510,8 +487,8 @@ fi
 # Report selected model
 echo ""
 echo "=== Model ==="
-if [ -n "${CLAWDBOT_MODEL}" ]; then
-    echo "Model: ${CLAWDBOT_MODEL} (explicit)"
+if [ -n "${OPENCLAW_MODEL}" ]; then
+    echo "Model: ${OPENCLAW_MODEL} (explicit)"
 elif [ -n "${MINIMAX_API_KEY}" ]; then
     echo "Model: minimax/MiniMax-M2.1 (auto-selected)"
 elif [ -n "${ANTHROPIC_API_KEY}" ]; then
@@ -548,13 +525,13 @@ This file stores durable facts and preferences.
 EOF
 fi
 
-echo "Starting Clawdbot..."
-echo "  Gateway port: ${CLAWDBOT_GATEWAY_PORT:-18789}"
-echo "  WebChat UI: http://localhost:${CLAWDBOT_GATEWAY_PORT:-18789}/chat"
+echo "Starting OpenClaw..."
+echo "  Gateway port: ${OPENCLAW_GATEWAY_PORT:-18789}"
+echo "  WebChat UI: http://localhost:${OPENCLAW_GATEWAY_PORT:-18789}/chat"
 
 # Display gateway token info
-if [ -n "${CLAWDBOT_GATEWAY_TOKEN}" ]; then
-    echo "  Gateway token: (from CLAWDBOT_GATEWAY_TOKEN env var)"
+if [ -n "${OPENCLAW_GATEWAY_TOKEN}" ]; then
+    echo "  Gateway token: (from OPENCLAW_GATEWAY_TOKEN env var)"
 elif [ -f "${TOKEN_FILE}" ]; then
     echo "  Gateway token: $(cat ${TOKEN_FILE})"
     echo "  Token persisted at: ${TOKEN_FILE}"
@@ -567,7 +544,7 @@ WEBCHAT_INDEX="/app/dist/control-ui/index.html"
 if [ -f "${WEBCHAT_INDEX}" ]; then
     # Inject script that sets the token in localStorage before the app initializes
     # The app reads settings from localStorage and uses the token for WebSocket auth
-    INJECT_SCRIPT="<script>(function(){try{var k='clawdbot.control.settings.v1',s=localStorage.getItem(k),o=s?JSON.parse(s):{};if(!o.token){o.token='${AUTH_TOKEN}';localStorage.setItem(k,JSON.stringify(o));}}catch(e){}})();</script>"
+    INJECT_SCRIPT="<script>(function(){try{var k='openclaw.control.settings.v1',s=localStorage.getItem(k),o=s?JSON.parse(s):{};if(!o.token){o.token='${AUTH_TOKEN}';localStorage.setItem(k,JSON.stringify(o));}}catch(e){}})();</script>"
     sed -i "s|</head>|${INJECT_SCRIPT}</head>|" "${WEBCHAT_INDEX}"
     echo "  Auth token injected into WebChat UI"
 fi

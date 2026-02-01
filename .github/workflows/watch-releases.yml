@@ -1,8 +1,8 @@
-name: Watch Clawdbot Releases
+name: Watch OpenClaw Releases
 
 on:
   schedule:
-    - cron: '0 0 */2 * *'  # Every 2 days
+    - cron: '0 0 * * *'  # Every day at midnight UTC
   workflow_dispatch:  # Manual trigger
 
 jobs:
@@ -12,11 +12,11 @@ jobs:
       new_release: ${{ steps.check.outputs.new_release }}
       version: ${{ steps.check.outputs.version }}
     steps:
-      - name: Get latest clawdbot release
+      - name: Get latest openclaw release
         id: fetch
         run: |
-          LATEST=$(gh release view -R clawdbot/clawdbot --json tagName -q .tagName)
-          echo "Latest clawdbot release: $LATEST"
+          LATEST=$(gh release view -R openclaw/openclaw --json tagName -q .tagName)
+          echo "Latest openclaw release: $LATEST"
           echo "version=$LATEST" >> $GITHUB_OUTPUT
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -26,7 +26,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: .last-version
-          key: clawdbot-version-${{ steps.fetch.outputs.version }}
+          key: openclaw-version-${{ steps.fetch.outputs.version }}
 
       - name: Check if new release
         id: check
@@ -45,7 +45,7 @@ jobs:
     if: needs.check-release.outputs.new_release == 'true'
     uses: ./.github/workflows/build.yml
     with:
-      clawdbot_version: ${{ needs.check-release.outputs.version }}
+      openclaw_version: ${{ needs.check-release.outputs.version }}
     secrets: inherit
     permissions:
       contents: read
@@ -63,4 +63,4 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: .last-version
-          key: clawdbot-version-${{ needs.check-release.outputs.version }}
+          key: openclaw-version-${{ needs.check-release.outputs.version }}

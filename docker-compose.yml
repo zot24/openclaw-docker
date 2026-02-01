@@ -1,14 +1,14 @@
 services:
-  clawdbot:
+  openclaw:
     build: .
     ports:
       - "18789:18789"   # Gateway + WebChat UI
       - "18790:18790"   # Bridge (mobile nodes)
     volumes:
-      # Mount config directory - edit config/clawdbot.json without rebuilding
-      - ./config:/home/clawdbot/.clawdbot
+      # Mount config directory - edit config/openclaw.json without rebuilding
+      - ./config:/home/openclaw/.openclaw
       # Persist workspace data (memory, skills, WhatsApp credentials)
-      - ./workspace:/home/clawdbot/clawd
+      - ./workspace:/home/openclaw/clawd
     environment:
       # LLM Provider (at least one required)
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
@@ -26,12 +26,12 @@ services:
       - WHATSAPP_ALLOWED_NUMBERS=${WHATSAPP_ALLOWED_NUMBERS:-}
 
       # Gateway auth token (auto-generated if not set)
-      - CLAWDBOT_GATEWAY_TOKEN=${CLAWDBOT_GATEWAY_TOKEN:-}
+      - OPENCLAW_GATEWAY_TOKEN=${OPENCLAW_GATEWAY_TOKEN:-}
 
       # ElevenLabs TTS (for sag command)
       - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY:-}
       - SAG_VOICE_ID=${SAG_VOICE_ID:-}
 
       # Set to "true" to regenerate config from env vars
-      # - CLAWDBOT_REGEN_CONFIG=true
+      # - OPENCLAW_REGEN_CONFIG=true
     restart: unless-stopped

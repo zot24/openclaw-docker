@@ -1,6 +1,6 @@
-# Clawdbot Docker Image
+# OpenClaw Docker Image
 
-Docker image for [Clawdbot](https://github.com/clawdbot/clawdbot) - your personal AI assistant.
+Docker image for [OpenClaw](https://github.com/openclaw/openclaw) - your personal AI assistant.
 
 Built for use with [Umbrel](https://umbrel.com) and other self-hosted platforms.
 
@@ -25,9 +25,9 @@ docker run -d \
   -p 18789:18789 \
   -e ANTHROPIC_API_KEY=your-key \
   -e TELEGRAM_BOT_TOKEN=your-bot-token \
-  -v clawdbot-data:/home/clawdbot/.clawdbot \
-  -v clawdbot-workspace:/home/clawdbot/clawd \
-  ghcr.io/zot24/clawdbot-docker:latest
+  -v openclaw-data:/home/openclaw/.openclaw \
+  -v openclaw-workspace:/home/openclaw/clawd \
+  ghcr.io/zot24/openclaw-docker:latest
 ```
 
 ## Supported Channels
@@ -53,7 +53,7 @@ docker run -d \
 | **GLM** | `GLM_API_KEY` | `glm/glm-4-plus` |
 | **Local (Ollama, etc.)** | `OPENCODE_BASE_URL` | `opencode/llama3.1` |
 
-The image auto-selects a model based on available API keys. Override with `CLAWDBOT_MODEL`.
+The image auto-selects a model based on available API keys. Override with `OPENCLAW_MODEL`.
 
 ## Environment Variables
 
@@ -72,7 +72,7 @@ The image auto-selects a model based on available API keys. Override with `CLAWD
 | `OPENCODE_BASE_URL` | | Local model endpoint (e.g., Ollama) |
 | `OPENCODE_API_KEY` | | API key for local endpoint |
 | `OPENCODE_MODEL` | | Model name for local provider |
-| `CLAWDBOT_MODEL` | | Override auto-selected model |
+| `OPENCLAW_MODEL` | | Override auto-selected model |
 
 ### Channels
 
@@ -80,7 +80,7 @@ The image auto-selects a model based on available API keys. Override with `CLAWD
 |----------|---------|-------------|
 | `TELEGRAM_BOT_TOKEN` | | Telegram bot token |
 | `TELEGRAM_ALLOWED_USERS` | | Comma-separated user IDs |
-| `CLAWDBOT_DM_POLICY` | `pairing` | DM policy: pairing, allowlist, open |
+| `OPENCLAW_DM_POLICY` | `pairing` | DM policy: pairing, allowlist, open |
 | `WHATSAPP_ENABLED` | `false` | Enable WhatsApp channel |
 | `WHATSAPP_DM_POLICY` | `pairing` | DM policy |
 | `WHATSAPP_GROUP_POLICY` | `disabled` | Group policy: disabled, allowlist |
@@ -100,8 +100,8 @@ The image auto-selects a model based on available API keys. Override with `CLAWD
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `CLAWDBOT_GATEWAY_TOKEN` | Auto-generated | Authentication token |
-| `CLAWDBOT_GATEWAY_PORT` | `18789` | Gateway port |
+| `OPENCLAW_GATEWAY_TOKEN` | Auto-generated | Authentication token |
+| `OPENCLAW_GATEWAY_PORT` | `18789` | Gateway port |
 | `GATEWAY_MODE` | `local` | Gateway mode: local, cloud |
 | `GATEWAY_BIND` | `lan` | Bind mode: lan, loopback, tailnet |
 
@@ -127,8 +127,8 @@ The image auto-selects a model based on available API keys. Override with `CLAWD
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `CLAWDBOT_DATA_DIR` | `/home/clawdbot/.clawdbot` | Config and credentials |
-| `CLAWDBOT_WORKSPACE` | `/home/clawdbot/clawd` | Workspace, memory, skills |
+| `OPENCLAW_DATA_DIR` | `/home/openclaw/.openclaw` | Config and credentials |
+| `OPENCLAW_WORKSPACE` | `/home/openclaw/clawd` | Workspace, memory, skills |
 
 ## Ports
 
@@ -137,8 +137,8 @@ The image auto-selects a model based on available API keys. Override with `CLAWD
 
 ## Volumes
 
-- `/home/clawdbot/.clawdbot`: Configuration and credentials
-- `/home/clawdbot/clawd`: Workspace, memory, and skills
+- `/home/openclaw/.openclaw`: Configuration and credentials
+- `/home/openclaw/clawd`: Workspace, memory, and skills
 
 ## Channel Setup
 
@@ -192,14 +192,14 @@ docker run -d \
   -e OPENCODE_BASE_URL=http://host.docker.internal:11434/v1 \
   -e OPENCODE_MODEL=llama3.1 \
   -e TELEGRAM_BOT_TOKEN=your-token \
-  -v clawdbot-data:/home/clawdbot/.clawdbot \
-  -v clawdbot-workspace:/home/clawdbot/clawd \
-  ghcr.io/zot24/clawdbot-docker:latest
+  -v openclaw-data:/home/openclaw/.openclaw \
+  -v openclaw-workspace:/home/openclaw/clawd \
+  ghcr.io/zot24/openclaw-docker:latest
 ```
 
 ### On Umbrel (Ollama in Another Container)
 
-When running both Clawdbot and Ollama as Umbrel apps, they communicate via Docker's internal network.
+When running both OpenClaw and Ollama as Umbrel apps, they communicate via Docker's internal network.
 
 **1. Find the Ollama container name:**
 
@@ -221,9 +221,9 @@ docker network ls | grep umbrel
 docker inspect <ollama-container-name> | grep -A5 Networks
 ```
 
-**4. Configure Clawdbot:**
+**4. Configure OpenClaw:**
 
-Set these environment variables in your Clawdbot configuration:
+Set these environment variables in your OpenClaw configuration:
 
 ```bash
 OPENCODE_BASE_URL=http://<ollama-container-name>:11434/v1
@@ -234,17 +234,17 @@ Replace `<ollama-container-name>` with the actual container name from step 1 (e.
 
 **5. Ensure both containers are on the same network:**
 
-If Clawdbot can't reach Ollama, connect it to Umbrel's network:
+If OpenClaw can't reach Ollama, connect it to Umbrel's network:
 
 ```bash
-docker network connect <umbrel-network> <clawdbot-container>
+docker network connect <umbrel-network> <openclaw-container>
 ```
 
 **Tip:** You can also use Ollama's internal IP address instead of the container name if DNS resolution doesn't work.
 
 ## Security
 
-This image runs as a dedicated non-root user (`clawdbot`, UID 1000) for enhanced security:
+This image runs as a dedicated non-root user (`openclaw`, UID 1000) for enhanced security:
 
 - **Principle of Least Privilege**: The container process has only the permissions it needs, not full root access
 - **Container Escape Mitigation**: If an attacker exploits a vulnerability in the application, they gain limited user privileges rather than root
@@ -274,12 +274,12 @@ The container uses UID/GID 1000, which matches the default user on most Linux sy
 docker compose build
 
 # Or build directly
-docker build -t clawdbot:local .
+docker build -t openclaw:local .
 ```
 
 The Dockerfile uses a multi-stage build for optimal caching:
 1. **deps**: System packages, Go, Python, global tools (cached)
-2. **builder**: Clone and build Clawdbot (rebuilds on version changes)
+2. **builder**: Clone and build OpenClaw (rebuilds on version changes)
 3. **runtime**: Final image with all tools
 
 ## Included Tools
@@ -304,9 +304,9 @@ The full-featured image is approximately 1.5-2GB due to:
 - Python and uv
 - Chromium browser
 - FFmpeg and ImageMagick
-- Clawdbot and dependencies
+- OpenClaw and dependencies
 
 ## License
 
-This Docker image builds [Clawdbot](https://github.com/clawdbot/clawdbot) from source.
+This Docker image builds [OpenClaw](https://github.com/openclaw/openclaw) from source.
 See the original repository for licensing information.

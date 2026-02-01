@@ -1,5 +1,5 @@
 # Local development configs (contains secrets)
-local/clawdbot.json
+local/openclaw.json
 local/.env
 local/*.local.json
 .env

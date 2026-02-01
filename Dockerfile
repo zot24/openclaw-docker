@@ -1,10 +1,10 @@
-# Clawdbot Docker Image
+# OpenClaw Docker Image
 # Multi-stage build for optimal caching and build times
 # Stage 1: Heavy dependencies (cached, rarely changes)
-# Stage 2: Build clawdbot (rebuilds on code changes)
+# Stage 2: Build OpenClaw (rebuilds on code changes)
 # Stage 3: Runtime (final image with all tools)
 #
-# Security: Runs as dedicated non-root 'clawdbot' user (UID 1000)
+# Security: Runs as dedicated non-root 'openclaw' user (UID 1000)
 
 # =============================================================================
 # Stage 1: Dependencies
@@ -12,13 +12,13 @@
 # =============================================================================
 FROM node:22-bookworm-slim AS deps
 
-# Create clawdbot user for running the application
+# Create openclaw user for running the application
 # The node:22-bookworm-slim base image has a 'node' user with UID/GID 1000.
-# We rename it to 'clawdbot' for clarity and create a proper home directory.
-RUN usermod -l clawdbot -d /home/clawdbot -m node \
-    && groupmod -n clawdbot node \
-    && mkdir -p /home/clawdbot \
-    && chown -R clawdbot:clawdbot /home/clawdbot
+# We rename it to 'openclaw' for clarity and create a proper home directory.
+RUN usermod -l openclaw -d /home/openclaw -m node \
+    && groupmod -n openclaw node \
+    && mkdir -p /home/openclaw \
+    && chown -R openclaw:openclaw /home/openclaw
 
 # Install system dependencies
 # - Build essentials: git, curl, ca-certificates, wget
@@ -92,15 +92,15 @@ ENV PATH="/usr/local/go/bin:${PATH}"
 
 # Install sag (ElevenLabs TTS CLI)
 # https://github.com/steipete/sag
-# Install as clawdbot user to set up paths correctly
-ENV GOPATH="/home/clawdbot/go"
-ENV PATH="/home/clawdbot/go/bin:/home/clawdbot/.local/bin:${PATH}"
-USER clawdbot
+# Install as openclaw user to set up paths correctly
+ENV GOPATH="/home/openclaw/go"
+ENV PATH="/home/openclaw/go/bin:/home/openclaw/.local/bin:${PATH}"
+USER openclaw
 RUN go install github.com/steipete/sag/cmd/sag@latest
 
 # Install Playwright Chromium browser
 # Playwright caches to ~/.cache/ms-playwright by default
-ENV PLAYWRIGHT_BROWSERS_PATH="/home/clawdbot/.cache/ms-playwright"
+ENV PLAYWRIGHT_BROWSERS_PATH="/home/openclaw/.cache/ms-playwright"
 RUN npx -y playwright@latest install chromium
 
 # Switch back to root for remaining build steps
@@ -108,15 +108,15 @@ USER root
 
 # =============================================================================
 # Stage 2: Builder
-# Clone and build Clawdbot (rebuilds when CLAWDBOT_VERSION changes)
+# Clone and build OpenClaw (rebuilds when OPENCLAW_VERSION changes)
 # =============================================================================
 FROM deps AS builder
 
 WORKDIR /app
 
-# Clone Clawdbot repository
-ARG CLAWDBOT_VERSION=main
-RUN git clone --depth 1 --branch ${CLAWDBOT_VERSION} https://github.com/clawdbot/clawdbot.git .
+# Clone OpenClaw repository
+ARG OPENCLAW_VERSION=main
+RUN git clone --depth 1 --branch ${OPENCLAW_VERSION} https://github.com/openclaw/openclaw.git .
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile || pnpm install
@@ -140,11 +140,11 @@ COPY --from=builder /app /app
 
 # Create data directories with proper ownership
 # These will typically be mounted as volumes
-RUN mkdir -p /home/clawdbot/.clawdbot /home/clawdbot/clawd \
-    && chown -R clawdbot:clawdbot /home/clawdbot/.clawdbot /home/clawdbot/clawd
+RUN mkdir -p /home/openclaw/.openclaw /home/openclaw/clawd \
+    && chown -R openclaw:openclaw /home/openclaw/.openclaw /home/openclaw/clawd
 
 # Set ownership of app directory for runtime modifications (e.g., WebChat token injection)
-RUN chown -R clawdbot:clawdbot /app
+RUN chown -R openclaw:openclaw /app
 
 # Copy entrypoint script
 COPY entrypoint.sh /entrypoint.sh
@@ -164,7 +164,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 
 # Run as non-root user for security
 # See: https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#user
-USER clawdbot
+USER openclaw
 
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["gateway"]
