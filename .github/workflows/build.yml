@@ -10,6 +10,14 @@ on:
         description: 'OpenClaw version/branch to build'
         required: false
         default: 'main'
+      platforms:
+        description: 'Platforms to build'
+        required: false
+        default: 'linux/amd64'
+        type: choice
+        options:
+          - linux/amd64
+          - linux/amd64,linux/arm64
   workflow_call:
     inputs:
       openclaw_version:
@@ -17,7 +25,7 @@ on:
         required: true
         type: string
   schedule:
-    # Rebuild weekly to get OpenClaw updates
+    # Weekly full rebuild (both platforms) to get OpenClaw updates
     - cron: '0 0 * * 0'
 
 env:
@@ -56,14 +64,28 @@ jobs:
           echo "openclaw_version=$VERSION" >> $GITHUB_OUTPUT
           echo "Building OpenClaw version: $VERSION"
 
+      - name: Determine platforms
+        id: platforms
+        run: |
+          # Tags and scheduled builds get both platforms, pushes to main get amd64 only for speed
+          if [[ "${{ github.ref_type }}" == "tag" ]] || [[ "${{ github.event_name }}" == "schedule" ]]; then
+            PLATFORMS="linux/amd64,linux/arm64"
+          elif [[ -n "${{ inputs.platforms }}" ]]; then
+            PLATFORMS="${{ inputs.platforms }}"
+          else
+            PLATFORMS="linux/amd64"
+          fi
+          echo "platforms=$PLATFORMS" >> $GITHUB_OUTPUT
+          echo "Building for platforms: $PLATFORMS"
+
       - name: Set up QEMU
+        if: contains(steps.platforms.outputs.platforms, 'arm64')
         uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to Container Registry
-        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
@@ -85,8 +107,8 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name != 'pull_request' }}
+          platforms: ${{ steps.platforms.outputs.platforms }}
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |

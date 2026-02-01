@@ -27,32 +27,23 @@ RUN usermod -l openclaw -d /home/openclaw -m node \
 # - Python tools: python3, pip
 # - Audio: ALSA/PulseAudio for TTS playback
 # - Utilities: gh (GitHub CLI), zip, unzip, tar
-RUN apt-get update && apt-get install -y \
-    # Build essentials
+RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     curl \
     wget \
     ca-certificates \
-    # GitHub CLI
     gh \
-    # Media processing
     ffmpeg \
     imagemagick \
-    # Audio playback (for sag TTS)
     alsa-utils \
     libasound2-dev \
     pkg-config \
     pulseaudio \
-    # Python (for uvx/MCP tools)
     python3 \
     python3-pip \
     python3-venv \
-    # Compression utilities
     zip \
     unzip \
-    tar \
-    gzip \
-    # Playwright/Chromium dependencies
     libnss3 \
     libnspr4 \
     libatk1.0-0 \
@@ -70,7 +61,6 @@ RUN apt-get update && apt-get install -y \
     libasound2 \
     libpango-1.0-0 \
     libcairo2 \
-    # X11 for headless browser (optional, for VNC debugging)
     xvfb \
     && rm -rf /var/lib/apt/lists/*
 
@@ -80,30 +70,23 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 # Install Node.js global tools
 RUN npm install -g mcporter
 
-# Install Python tools (uv/uvx for running Python MCP tools, whisper for STT)
-RUN pip3 install --no-cache-dir --break-system-packages uv openai-whisper
+# Install Python tools - uv only (whisper is optional and heavy)
+# Users who need STT can install whisper manually
+RUN pip3 install --no-cache-dir --break-system-packages uv
 
-# Install Go from official source (Debian's golang-go is too old for sag)
-# sag requires Go 1.24+, Debian bookworm only has 1.19
-ARG GO_VERSION=1.24.3
-RUN ARCH=$(dpkg --print-architecture) && \
-    curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-${ARCH}.tar.gz" | tar -C /usr/local -xzf -
-ENV PATH="/usr/local/go/bin:${PATH}"
-
-# Install sag (ElevenLabs TTS CLI)
+# Install sag (ElevenLabs TTS CLI) - download pre-built binary
 # https://github.com/steipete/sag
-# Install as openclaw user to set up paths correctly
-ENV GOPATH="/home/openclaw/go"
-ENV PATH="/home/openclaw/go/bin:/home/openclaw/.local/bin:${PATH}"
-USER openclaw
-RUN go install github.com/steipete/sag/cmd/sag@latest
+ARG SAG_VERSION=0.3.2
+RUN ARCH=$(dpkg --print-architecture) && \
+    if [ "$ARCH" = "amd64" ]; then SAG_ARCH="x86_64"; else SAG_ARCH="aarch64"; fi && \
+    curl -fsSL "https://github.com/steipete/sag/releases/download/v${SAG_VERSION}/sag-v${SAG_VERSION}-${SAG_ARCH}-unknown-linux-gnu.tar.gz" | \
+    tar -xzf - -C /usr/local/bin sag && \
+    chmod +x /usr/local/bin/sag
 
-# Install Playwright Chromium browser
-# Playwright caches to ~/.cache/ms-playwright by default
+# Install Playwright Chromium browser as openclaw user
 ENV PLAYWRIGHT_BROWSERS_PATH="/home/openclaw/.cache/ms-playwright"
+USER openclaw
 RUN npx -y playwright@latest install chromium
-
-# Switch back to root for remaining build steps
 USER root
 
 # =============================================================================
@@ -118,14 +101,9 @@ WORKDIR /app
 ARG OPENCLAW_VERSION=main
 RUN git clone --depth 1 --branch ${OPENCLAW_VERSION} https://github.com/openclaw/openclaw.git .
 
-# Install dependencies
+# Install dependencies and build in one layer for efficiency
 RUN pnpm install --frozen-lockfile || pnpm install
-
-# Build the application
-RUN pnpm build
-
-# Build the UI assets (Control Panel, WebChat)
-RUN pnpm ui:build
+RUN pnpm build && pnpm ui:build
 
 # =============================================================================
 # Stage 3: Runtime
@@ -135,19 +113,15 @@ FROM deps AS runtime
 
 WORKDIR /app
 
-# Copy built application from builder
-COPY --from=builder /app /app
+# Copy built application from builder with correct ownership (avoids slow chown)
+COPY --from=builder --chown=openclaw:openclaw /app /app
 
 # Create data directories with proper ownership
-# These will typically be mounted as volumes
 RUN mkdir -p /home/openclaw/.openclaw /home/openclaw/clawd \
     && chown -R openclaw:openclaw /home/openclaw/.openclaw /home/openclaw/clawd
 
-# Set ownership of app directory for runtime modifications (e.g., WebChat token injection)
-RUN chown -R openclaw:openclaw /app
-
 # Copy entrypoint script
-COPY entrypoint.sh /entrypoint.sh
+COPY --chown=openclaw:openclaw entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Expose ports
@@ -163,7 +137,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:18789/ || exit 1
 
 # Run as non-root user for security
-# See: https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#user
 USER openclaw
 
 ENTRYPOINT ["/entrypoint.sh"]
