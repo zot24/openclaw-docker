@@ -1,0 +1,85 @@
+# OpenClaw Base Image
+# Contains all system dependencies that rarely change
+# Built separately and pushed to registry for fast reuse
+#
+# Rebuild triggers: changes to this file, weekly schedule
+
+FROM node:22-bookworm-slim
+
+# Create openclaw user
+RUN usermod -l openclaw -d /home/openclaw -m node \
+    && groupmod -n openclaw node \
+    && mkdir -p /home/openclaw \
+    && chown -R openclaw:openclaw /home/openclaw
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    curl \
+    wget \
+    ca-certificates \
+    gh \
+    ffmpeg \
+    imagemagick \
+    alsa-utils \
+    libasound2-dev \
+    pkg-config \
+    pulseaudio \
+    python3 \
+    python3-pip \
+    python3-venv \
+    zip \
+    unzip \
+    gcc \
+    libc6-dev \
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libdbus-1-3 \
+    libxkbcommon0 \
+    libatspi2.0-0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 \
+    libpango-1.0-0 \
+    libcairo2 \
+    xvfb \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+# Install Node.js global tools
+RUN npm install -g mcporter
+
+# Install Python tools
+RUN pip3 install --no-cache-dir --break-system-packages uv
+
+# Install Go (needed for sag on arm64, and useful for other tools)
+ARG GO_VERSION=1.24.3
+RUN ARCH=$(dpkg --print-architecture) && \
+    curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-${ARCH}.tar.gz" | tar -C /usr/local -xzf -
+ENV PATH="/usr/local/go/bin:/home/openclaw/go/bin:${PATH}"
+ENV GOPATH="/home/openclaw/go"
+
+# Install sag (ElevenLabs TTS CLI) - compile from source
+# Requires CGO for audio library (oto)
+USER openclaw
+RUN CGO_ENABLED=1 go install github.com/steipete/sag/cmd/sag@latest
+USER root
+
+# Install Playwright Chromium browser as openclaw user
+ENV PLAYWRIGHT_BROWSERS_PATH="/home/openclaw/.cache/ms-playwright"
+USER openclaw
+RUN npx -y playwright@latest install chromium
+USER root
+
+# Labels
+LABEL org.opencontainers.image.source="https://github.com/zot24/openclaw-docker"
+LABEL org.opencontainers.image.description="OpenClaw base image with system dependencies"
