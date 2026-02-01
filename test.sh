@@ -4,15 +4,32 @@
 
 set -e
 
+BASE_IMAGE="ghcr.io/zot24/openclaw-base:latest"
 IMAGE_NAME="openclaw:test"
 CONTAINER_NAME="openclaw-test-$$"
-TIMEOUT=30
 
 echo "=== OpenClaw Docker Local Validation ==="
 echo ""
 
-# Step 1: Build the image
-echo "[1/3] Building image..."
+# Step 1: Check/build base image
+echo "[1/4] Checking base image..."
+if ! docker image inspect "$BASE_IMAGE" > /dev/null 2>&1; then
+    echo "Base image not found locally. Building from Dockerfile.base..."
+    echo "(This is slow the first time, but cached afterwards)"
+    echo ""
+    if ! docker build -f Dockerfile.base -t "$BASE_IMAGE" . ; then
+        echo "FAIL: Base image build failed"
+        exit 1
+    fi
+    echo ""
+    echo "OK: Base image built successfully"
+else
+    echo "OK: Base image exists locally"
+fi
+echo ""
+
+# Step 2: Build the main image
+echo "[2/4] Building main image..."
 if ! docker build -t "$IMAGE_NAME" . ; then
     echo "FAIL: Docker build failed"
     exit 1
@@ -20,8 +37,8 @@ fi
 echo "OK: Image built successfully"
 echo ""
 
-# Step 2: Run container and capture startup logs
-echo "[2/3] Starting container..."
+# Step 3: Run container and validate startup
+echo "[3/4] Starting container..."
 docker run -d --name "$CONTAINER_NAME" -p 18799:18789 "$IMAGE_NAME" > /dev/null
 
 # Wait for startup (gateway can take 15-20s to fully initialize)
@@ -58,8 +75,8 @@ for i in {1..30}; do
     fi
 done
 
-# Step 3: Final validation
-echo "[3/3] Validating services..."
+# Step 4: Final validation
+echo "[4/4] Validating services..."
 
 # Check WebChat UI is accessible
 if curl -s -o /dev/null -w "%{http_code}" http://localhost:18799/chat | grep -q "200"; then

@@ -1,7 +1,5 @@
 # Local development configs (contains secrets)
-local/openclaw.json
-local/.env
-local/*.local.json
+local/
 .env
 
 # Docker mounted volume (user config, credentials, session data)
