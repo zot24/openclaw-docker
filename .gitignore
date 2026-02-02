@@ -8,3 +8,4 @@ workspace/
 
 # Claude Code local settings
 .claude/
+docker-compose.override.yml

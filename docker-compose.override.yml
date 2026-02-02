@@ -1,4 +1,0 @@
-services:
-  openclaw:
-    image: ghcr.io/zot24/openclaw-docker:latest
-    build: !reset null
