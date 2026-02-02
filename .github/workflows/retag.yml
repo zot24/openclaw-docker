@@ -1,0 +1,40 @@
+name: Retag Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_tag:
+        description: 'Source tag to copy from'
+        required: true
+        default: 'latest'
+      target_tag:
+        description: 'New tag to create'
+        required: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  retag:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+
+    steps:
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install crane
+        run: |
+          VERSION=$(curl -s "https://api.github.com/repos/google/go-containerregistry/releases/latest" | jq -r '.tag_name')
+          curl -sL "https://github.com/google/go-containerregistry/releases/download/${VERSION}/go-containerregistry_Linux_x86_64.tar.gz" | tar -xzf - crane
+
+      - name: Retag image
+        run: |
+          ./crane tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.source_tag }} ${{ inputs.target_tag }}
+          echo "Tagged ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.source_tag }} as ${{ inputs.target_tag }}"
