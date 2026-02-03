@@ -1,7 +1,8 @@
 services:
   openclaw:
     build: .
-    user: "1000:1000"
+    # Note: For Umbrel, add "user: 1000:1000" (standard Umbrel pattern)
+    # Local dev doesn't need it since volumes are local and owned by current user
     ports:
       - "18789:18789"   # Gateway + WebChat UI
       - "18790:18790"   # Bridge (mobile nodes)
