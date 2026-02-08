@@ -58,17 +58,23 @@ jobs:
       - name: Determine OpenClaw version
         id: version
         run: |
-          # workflow_call inputs take precedence, then workflow_dispatch, then default
-          VERSION="${{ inputs.openclaw_version || github.event.inputs.openclaw_version || 'main' }}"
-          echo "openclaw_version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Building OpenClaw version: $VERSION"
+          # Single version source used for both building AND tagging.
+          # Priority: explicit input (workflow_call/dispatch) > VERSION file > 'main'
+          INPUT_VERSION="${{ inputs.openclaw_version }}"
+          FILE_VERSION=$(cat VERSION 2>/dev/null || echo "")
 
-      - name: Read upstream version
-        id: upstream
-        run: |
-          VERSION=$(cat VERSION 2>/dev/null || echo "main")
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Upstream version: $VERSION"
+          if [[ -n "$INPUT_VERSION" ]]; then
+            VERSION="$INPUT_VERSION"
+            echo "Using version from input: $VERSION"
+          elif [[ -n "$FILE_VERSION" ]]; then
+            VERSION="$FILE_VERSION"
+            echo "Using version from VERSION file: $VERSION"
+          else
+            VERSION="main"
+            echo "No version specified, defaulting to: main"
+          fi
+
+          echo "openclaw_version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Determine platforms
         id: platforms
@@ -104,7 +110,7 @@ jobs:
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix=
-            type=raw,value=${{ steps.upstream.outputs.version }},enable=${{ steps.upstream.outputs.version != 'main' }}
+            type=raw,value=${{ steps.version.outputs.openclaw_version }},enable=${{ steps.version.outputs.openclaw_version != 'main' }}
 
       - name: Build and push
         uses: docker/build-push-action@v5

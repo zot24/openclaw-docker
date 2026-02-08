@@ -12,6 +12,9 @@ jobs:
       new_release: ${{ steps.check.outputs.new_release }}
       version: ${{ steps.check.outputs.version }}
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Get latest openclaw release
         id: fetch
         run: |
@@ -21,23 +24,20 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Restore cached version
-        id: cache
-        uses: actions/cache/restore@v4
-        with:
-          path: .last-version
-          key: openclaw-version-${{ steps.fetch.outputs.version }}
-
       - name: Check if new release
         id: check
         run: |
-          if [ "${{ steps.cache.outputs.cache-hit }}" == "true" ]; then
-            echo "Version ${{ steps.fetch.outputs.version }} already built"
+          CURRENT=$(cat VERSION 2>/dev/null || echo "")
+          LATEST="${{ steps.fetch.outputs.version }}"
+          echo "Current VERSION file: $CURRENT"
+          echo "Latest upstream release: $LATEST"
+          if [ "$CURRENT" == "$LATEST" ]; then
+            echo "Version $LATEST already tracked in VERSION file"
             echo "new_release=false" >> $GITHUB_OUTPUT
           else
-            echo "New release detected: ${{ steps.fetch.outputs.version }}"
+            echo "New release detected: $LATEST (was: $CURRENT)"
             echo "new_release=true" >> $GITHUB_OUTPUT
-            echo "version=${{ steps.fetch.outputs.version }}" >> $GITHUB_OUTPUT
+            echo "version=$LATEST" >> $GITHUB_OUTPUT
           fi
 
   update-version:
@@ -71,17 +71,3 @@ jobs:
     permissions:
       contents: read
       packages: write
-
-  update-cache:
-    needs: [check-release, build]
-    if: needs.check-release.outputs.new_release == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Create version file
-        run: echo "${{ needs.check-release.outputs.version }}" > .last-version
-
-      - name: Save version to cache
-        uses: actions/cache/save@v4
-        with:
-          path: .last-version
-          key: openclaw-version-${{ needs.check-release.outputs.version }}
